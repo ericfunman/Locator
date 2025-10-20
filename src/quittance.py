@@ -65,29 +65,26 @@ def generer_quittance_simple(locataire, chambre, appartement, paiement, mois, an
     doc.add_paragraph()
     doc.add_paragraph('Au titre de :')
     
+    # Utiliser le montant du paiement pour avoir le montant historique correct
+    montant_total = paiement.montant
+    
+    # Pour une quittance simple, on ne peut pas séparer loyer/charges
+    # car on n'a que le montant total du paiement
+    # On affiche juste le total
+    
     # Tableau des détails
-    table = doc.add_table(rows=4, cols=2)
+    table = doc.add_table(rows=2, cols=2)
     table.style = 'Light Grid Accent 1'
     
-    # Loyer
-    row = table.rows[0]
-    row.cells[0].text = 'Loyer'
-    row.cells[1].text = f'{chambre.loyer:.2f} €'
-    
-    # Charges
-    row = table.rows[1]
-    row.cells[0].text = 'Charges'
-    row.cells[1].text = f'{chambre.charges:.2f} €'
-    
-    # Ligne vide
-    row = table.rows[2]
-    row.cells[0].text = ''
-    row.cells[1].text = ''
-    
     # Total
-    row = table.rows[3]
+    row = table.rows[0]
+    row.cells[0].text = 'Loyer et charges'
+    row.cells[1].text = f'{montant_total:.2f} €'
+    
+    # Total (répété pour clarté)
+    row = table.rows[1]
     row.cells[0].text = 'TOTAL'
-    row.cells[1].text = f'{chambre.loyer + chambre.charges:.2f} €'
+    row.cells[1].text = f'{montant_total:.2f} €'
     
     # Informations supplémentaires
     doc.add_paragraph()
@@ -191,6 +188,10 @@ def generer_quittance_complete(locataire, bail, chambre, appartement, paiement, 
     nom_complet = locataire.nom
     adresse_complete = f"{appartement.adresse}, {appartement.code_postal} {appartement.ville}"
     
+    # Utiliser le montant du paiement pour avoir le montant historique correct
+    # et non le montant actuel du bail qui peut avoir changé
+    montant_loyer = paiement.montant
+    
     # Dictionnaire de remplacement avec les nouvelles variables
     replacements = {
         'DATE_DEBUT_MOIS': date_debut_mois.strftime('%d/%m/%Y'),
@@ -199,7 +200,7 @@ def generer_quittance_complete(locataire, bail, chambre, appartement, paiement, 
         'DATE_FIN_SUIVANT_MOIS': date_fin_mois_suivant.strftime('%d/%m/%Y'),
         'ADRESSE_BIEN': adresse_complete,
         'NOM_LOCATAIRE': nom_complet,
-        'MT_LOYER': f"{bail.loyer_total:.2f} €",
+        'MT_LOYER': f"{montant_loyer:.2f} €",
     }
     
     # Fonction pour remplacer dans un texte en gardant le formatage
