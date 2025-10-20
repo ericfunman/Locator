@@ -13,11 +13,13 @@ cd /d "%~dp0"
 echo Repertoire: %CD%
 echo.
 
-REM Vérifier que conda est installé
-where conda >nul 2>nul
-if %errorlevel% neq 0 (
-    echo ERREUR: Conda n'est pas installe ou n'est pas dans le PATH
-    echo Veuillez installer Miniconda ou Anaconda
+REM Définir le chemin vers conda
+set CONDA_PATH=C:\Users\lapin\miniconda3\Scripts\conda.exe
+
+REM Vérifier que conda existe
+if not exist "%CONDA_PATH%" (
+    echo ERREUR: Conda n'est pas trouve a l'emplacement : %CONDA_PATH%
+    echo Veuillez verifier le chemin d'installation de Miniconda
     pause
     exit /b 1
 )
@@ -31,7 +33,7 @@ echo ========================================
 echo.
 
 REM Lancer Streamlit avec conda
-C:\Users\lapin\miniconda3\Scripts\conda.exe run -p C:\Users\lapin\miniconda3 --no-capture-output streamlit run app.py
+"%CONDA_PATH%" run -p C:\Users\lapin\miniconda3 --no-capture-output streamlit run app.py
 
 REM Si l'application s'arrête
 echo.
