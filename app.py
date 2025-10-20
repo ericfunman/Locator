@@ -438,21 +438,67 @@ elif menu == "👥 Locataires":
                         st.warning("Aucun locataire assigné à ce bail")
                     else:
                         for loc in locataires:
-                            col_a, col_b, col_c, col_d = st.columns([2, 2, 2, 1])
-                            with col_a:
-                                st.write(f"**{loc.nom}**")
-                            with col_b:
-                                st.write(f"📧 {loc.email or 'N/A'}")
-                                st.write(f"📞 {loc.telephone or 'N/A'}")
-                            with col_c:
-                                if loc.part_loyer:
-                                    st.write(f"💰 Part: {loc.part_loyer:.2f} €")
-                                st.write(f"🔒 Caution: {loc.depot_garantie:.2f} €")
-                            with col_d:
-                                if st.button("🗑️", key=f"del_loc_{loc.id}"):
-                                    if db.delete_locataire(loc.id):
-                                        st.success("Locataire retiré")
+                            # Vérifier si on est en mode édition pour ce locataire
+                            if st.session_state.get(f'editing_loc_{loc.id}', False):
+                                # Mode édition
+                                with st.form(key=f"form_edit_loc_{loc.id}"):
+                                    st.markdown(f"**✏️ Modification de {loc.nom}**")
+                                    col1, col2, col3 = st.columns(3)
+                                    with col1:
+                                        edit_nom = st.text_input("Nom complet *", value=loc.nom, key=f"edit_nom_{loc.id}")
+                                        edit_email = st.text_input("Email", value=loc.email or "", key=f"edit_email_{loc.id}")
+                                    with col2:
+                                        edit_telephone = st.text_input("Téléphone", value=loc.telephone or "", key=f"edit_tel_{loc.id}")
+                                        edit_part_loyer = st.number_input("Part du loyer (€)", min_value=0.0, value=float(loc.part_loyer or 0), step=10.0, key=f"edit_part_{loc.id}")
+                                    with col3:
+                                        edit_depot = st.number_input("Dépôt de garantie (€)", min_value=0.0, value=float(loc.depot_garantie), step=50.0, key=f"edit_depot_{loc.id}")
+                                        edit_date_entree = st.date_input("Date d'entrée", value=loc.date_entree, key=f"edit_date_{loc.id}")
+                                    
+                                    edit_notes = st.text_area("Notes", value=loc.notes or "", key=f"edit_notes_{loc.id}")
+                                    
+                                    col_btn1, col_btn2 = st.columns(2)
+                                    with col_btn1:
+                                        if st.form_submit_button("💾 Enregistrer"):
+                                            try:
+                                                db.update_locataire(
+                                                    loc.id,
+                                                    nom=edit_nom,
+                                                    email=edit_email if edit_email else None,
+                                                    telephone=edit_telephone if edit_telephone else None,
+                                                    date_entree=edit_date_entree,
+                                                    depot_garantie=edit_depot,
+                                                    part_loyer=edit_part_loyer if edit_part_loyer > 0 else None,
+                                                    notes=edit_notes
+                                                )
+                                                st.success("✅ Locataire modifié avec succès!")
+                                                del st.session_state[f'editing_loc_{loc.id}']
+                                                st.rerun()
+                                            except Exception as e:
+                                                st.error(f"❌ Erreur: {str(e)}")
+                                    with col_btn2:
+                                        if st.form_submit_button("❌ Annuler"):
+                                            del st.session_state[f'editing_loc_{loc.id}']
+                                            st.rerun()
+                            else:
+                                # Mode affichage normal
+                                col_a, col_b, col_c, col_d = st.columns([2, 2, 2, 1])
+                                with col_a:
+                                    st.write(f"**{loc.nom}**")
+                                with col_b:
+                                    st.write(f"📧 {loc.email or 'N/A'}")
+                                    st.write(f"📞 {loc.telephone or 'N/A'}")
+                                with col_c:
+                                    if loc.part_loyer:
+                                        st.write(f"💰 Part: {loc.part_loyer:.2f} €")
+                                    st.write(f"🔒 Caution: {loc.depot_garantie:.2f} €")
+                                with col_d:
+                                    if st.button("✏️", key=f"edit_loc_btn_{loc.id}", help="Modifier"):
+                                        st.session_state[f'editing_loc_{loc.id}'] = True
                                         st.rerun()
+                                    if st.button("🗑️", key=f"del_loc_{loc.id}", help="Supprimer"):
+                                        if db.delete_locataire(loc.id):
+                                            st.success("Locataire retiré")
+                                            st.rerun()
                     
                     # Ajouter un locataire au bail
                     st.markdown("**➕ Ajouter un locataire à ce bail**")
