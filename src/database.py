@@ -720,13 +720,23 @@ def update_bail_loyer(bail_id, nouveau_loyer, nouvelles_charges, date_applicatio
         locataires = session.query(Locataire).filter(Locataire.bail_id == bail_id).all()
         
         # Mettre à jour les paiements pour chaque locataire
+        nb_locataires = len(locataires)
         for locataire in locataires:
-            # Calculer le montant pour ce locataire
+            # Calculer le nouveau montant pour ce locataire
             if locataire.part_loyer is not None:
-                nouveau_montant = locataire.part_loyer
+                # Si une part est définie, calculer la proportion et l'appliquer au nouveau total
+                ancien_total = ancien_loyer + anciennes_charges
+                if ancien_total > 0:
+                    proportion = locataire.part_loyer / ancien_total
+                    nouveau_montant = nouveau_montant_total * proportion
+                else:
+                    # Si pas de loyer précédent, diviser équitablement
+                    nouveau_montant = nouveau_montant_total / nb_locataires if nb_locataires > 0 else nouveau_montant_total
+                
+                # Mettre à jour la part_loyer du locataire
+                locataire.part_loyer = nouveau_montant
             else:
                 # Si pas de part définie, diviser équitablement
-                nb_locataires = len(locataires)
                 nouveau_montant = nouveau_montant_total / nb_locataires if nb_locataires > 0 else nouveau_montant_total
             
             # Mettre à jour les paiements futurs (>= date d'application)
