@@ -71,9 +71,31 @@ class Bail(Base):
     # Relations
     chambre = relationship("Chambre", back_populates="bails")
     locataires = relationship("Locataire", back_populates="bail")
+    historique_loyers = relationship("HistoriqueLoyer", back_populates="bail", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<Bail(chambre_id={self.chambre_id}, actif={self.actif})>"
+
+
+class HistoriqueLoyer(Base):
+    """Modèle pour l'historique des changements de loyer"""
+    __tablename__ = 'historique_loyers'
+    
+    id = Column(Integer, primary_key=True)
+    bail_id = Column(Integer, ForeignKey('bails.id'), nullable=False)
+    ancien_loyer = Column(Float, nullable=False)
+    nouveau_loyer = Column(Float, nullable=False)
+    anciennes_charges = Column(Float, default=0.0)
+    nouvelles_charges = Column(Float, default=0.0)
+    date_changement = Column(DateTime, default=datetime.now)  # Date de l'enregistrement du changement
+    date_application = Column(Date, nullable=False)  # Date à partir de laquelle le nouveau loyer s'applique
+    notes = Column(Text)
+    
+    # Relations
+    bail = relationship("Bail", back_populates="historique_loyers")
+    
+    def __repr__(self):
+        return f"<HistoriqueLoyer(bail_id={self.bail_id}, ancien={self.ancien_loyer}, nouveau={self.nouveau_loyer})>"
 
 
 class Locataire(Base):

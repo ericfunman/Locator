@@ -24,6 +24,7 @@ st.set_page_config(
 # Initialisation
 if 'initialized' not in st.session_state:
     db.init_db()
+    db.migrate_db()  # Ajoute les nouvelles tables si nécessaire
     fm.init_directories()
     st.session_state.initialized = True
 
@@ -358,6 +359,59 @@ elif menu == "👥 Locataires":
                             st.write(f"**📅 Fin du bail:** {bail.date_fin.strftime('%d/%m/%Y')}")
                         if bail.notes:
                             st.write(f"**📝 Notes:** {bail.notes}")
+                    
+                    # Bouton pour modifier le loyer
+                    if st.button("✏️ Modifier le loyer", key=f"edit_loyer_{bail.id}"):
+                        st.session_state[f'editing_loyer_{bail.id}'] = True
+                    
+                    # Formulaire de modification du loyer
+                    if st.session_state.get(f'editing_loyer_{bail.id}', False):
+                        st.markdown("---")
+                        st.subheader("💰 Modification du loyer")
+                        
+                        # Afficher l'historique s'il existe
+                        historiques = db.get_historique_by_bail(bail.id)
+                        if historiques:
+                            st.markdown("**📜 Historique des loyers:**")
+                            for hist in historiques:
+                                st.info(f"**{hist.date_application.strftime('%d/%m/%Y')}**: {hist.ancien_loyer:.2f} € → {hist.nouveau_loyer:.2f} € (Charges: {hist.anciennes_charges:.2f} € → {hist.nouvelles_charges:.2f} €) - {hist.notes}")
+                        
+                        with st.form(key=f"form_edit_loyer_{bail.id}"):
+                            st.write(f"**Loyer actuel:** {bail.loyer_total:.2f} €")
+                            st.write(f"**Charges actuelles:** {bail.charges_total:.2f} €")
+                            
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                nouveau_loyer = st.number_input("Nouveau loyer *", min_value=0.0, value=float(bail.loyer_total), step=10.0, key=f"new_loyer_{bail.id}")
+                            with col2:
+                                nouvelles_charges = st.number_input("Nouvelles charges *", min_value=0.0, value=float(bail.charges_total), step=5.0, key=f"new_charges_{bail.id}")
+                            with col3:
+                                date_application = st.date_input("Date d'application *", value=datetime.now().date(), key=f"date_app_{bail.id}")
+                            
+                            notes_modif = st.text_area("Notes sur cette modification", key=f"notes_modif_{bail.id}")
+                            
+                            st.warning("⚠️ Cette modification mettra à jour tous les paiements futurs à partir de la date d'application.")
+                            
+                            col_btn1, col_btn2 = st.columns(2)
+                            with col_btn1:
+                                if st.form_submit_button("💾 Enregistrer la modification"):
+                                    try:
+                                        bail_updated, nb_paiements = db.update_bail_loyer(
+                                            bail.id,
+                                            nouveau_loyer,
+                                            nouvelles_charges,
+                                            date_application,
+                                            notes_modif
+                                        )
+                                        st.success(f"✅ Loyer modifié avec succès! {nb_paiements} paiements ont été mis à jour.")
+                                        del st.session_state[f'editing_loyer_{bail.id}']
+                                        st.rerun()
+                                    except Exception as e:
+                                        st.error(f"Erreur: {str(e)}")
+                            with col_btn2:
+                                if st.form_submit_button("❌ Annuler"):
+                                    del st.session_state[f'editing_loyer_{bail.id}']
+                                    st.rerun()
                     
                     st.markdown("---")
                     st.subheader("👥 Locataires sur ce bail")

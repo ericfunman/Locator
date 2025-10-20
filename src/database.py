@@ -5,7 +5,7 @@ Module de gestion de la base de données
 from sqlalchemy import create_engine, and_, or_
 from sqlalchemy.orm import sessionmaker, scoped_session
 from datetime import datetime, date
-from .models import Base, Appartement, Chambre, Bail, Locataire, Paiement, Facture, AlerteEmail
+from .models import Base, Appartement, Chambre, Bail, Locataire, Paiement, Facture, AlerteEmail, HistoriqueLoyer
 import os
 
 # Configuration de la base de données
@@ -21,6 +21,17 @@ def init_db():
     """Initialise la base de données"""
     Base.metadata.create_all(engine)
     print("Base de données initialisée avec succès")
+
+
+def migrate_db():
+    """Ajoute les nouvelles tables sans supprimer les données existantes"""
+    try:
+        # Crée uniquement les tables manquantes
+        Base.metadata.create_all(engine)
+        print("Migration de la base de données effectuée avec succès")
+    except Exception as e:
+        print(f"Erreur lors de la migration : {e}")
+        raise e
 
 
 def get_session():
@@ -625,5 +636,131 @@ def get_statistiques():
             stats['taux_occupation'] = 0
         
         return stats
+    finally:
+        session.close()
+
+
+# ==================== HISTORIQUE DES LOYERS ====================
+
+def create_historique_loyer(bail_id, ancien_loyer, nouveau_loyer, anciennes_charges, nouvelles_charges, date_application, notes=""):
+    """Crée un historique de changement de loyer"""
+    session = get_session()
+    try:
+        historique = HistoriqueLoyer(
+            bail_id=bail_id,
+            ancien_loyer=ancien_loyer,
+            nouveau_loyer=nouveau_loyer,
+            anciennes_charges=anciennes_charges,
+            nouvelles_charges=nouvelles_charges,
+            date_application=date_application,
+            notes=notes
+        )
+        session.add(historique)
+        session.commit()
+        return historique
+    except Exception as e:
+        session.rollback()
+        raise e
+    finally:
+        session.close()
+
+
+def get_historique_by_bail(bail_id):
+    """Récupère l'historique des changements de loyer pour un bail"""
+    session = get_session()
+    try:
+        historiques = session.query(HistoriqueLoyer).filter(
+            HistoriqueLoyer.bail_id == bail_id
+        ).order_by(HistoriqueLoyer.date_application.desc()).all()
+        return historiques
+    finally:
+        session.close()
+
+
+def update_bail_loyer(bail_id, nouveau_loyer, nouvelles_charges, date_application, notes=""):
+    """
+    Met à jour le loyer d'un bail et crée un historique.
+    Met également à jour tous les paiements futurs à partir de la date d'application.
+    """
+    session = get_session()
+    try:
+        # Récupérer le bail
+        bail = session.query(Bail).filter(Bail.id == bail_id).first()
+        if not bail:
+            raise ValueError("Bail introuvable")
+        
+        # Sauvegarder les anciennes valeurs
+        ancien_loyer = bail.loyer_total
+        anciennes_charges = bail.charges_total
+        
+        # Créer l'historique
+        historique = HistoriqueLoyer(
+            bail_id=bail_id,
+            ancien_loyer=ancien_loyer,
+            nouveau_loyer=nouveau_loyer,
+            anciennes_charges=anciennes_charges,
+            nouvelles_charges=nouvelles_charges,
+            date_application=date_application,
+            notes=notes
+        )
+        session.add(historique)
+        
+        # Mettre à jour le bail
+        bail.loyer_total = nouveau_loyer
+        bail.charges_total = nouvelles_charges
+        
+        # Mettre à jour les paiements futurs
+        annee_application = date_application.year
+        mois_application = date_application.month
+        
+        # Calculer le nouveau montant total
+        nouveau_montant_total = nouveau_loyer + nouvelles_charges
+        
+        # Récupérer tous les locataires du bail
+        locataires = session.query(Locataire).filter(Locataire.bail_id == bail_id).all()
+        
+        # Mettre à jour les paiements pour chaque locataire
+        for locataire in locataires:
+            # Calculer le montant pour ce locataire
+            if locataire.part_loyer is not None:
+                nouveau_montant = locataire.part_loyer
+            else:
+                # Si pas de part définie, diviser équitablement
+                nb_locataires = len(locataires)
+                nouveau_montant = nouveau_montant_total / nb_locataires if nb_locataires > 0 else nouveau_montant_total
+            
+            # Mettre à jour les paiements futurs (>= date d'application)
+            paiements_futurs = session.query(Paiement).filter(
+                and_(
+                    Paiement.locataire_id == locataire.id,
+                    or_(
+                        Paiement.annee > annee_application,
+                        and_(
+                            Paiement.annee == annee_application,
+                            Paiement.mois >= mois_application
+                        )
+                    )
+                )
+            ).all()
+            
+            for paiement in paiements_futurs:
+                paiement.montant = nouveau_montant
+        
+        session.commit()
+        return bail, len([p for loc in locataires for p in session.query(Paiement).filter(
+            and_(
+                Paiement.locataire_id == loc.id,
+                or_(
+                    Paiement.annee > annee_application,
+                    and_(
+                        Paiement.annee == annee_application,
+                        Paiement.mois >= mois_application
+                    )
+                )
+            )
+        ).all()])
+    except Exception as e:
+        session.rollback()
+        raise e
     finally:
         session.close()
