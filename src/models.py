@@ -144,6 +144,8 @@ class Paiement(Base):
     quittance_generee = Column(Boolean, default=False)
     date_quittance = Column(Date, nullable=True)  # Date de génération de la quittance
     chemin_quittance = Column(String(500), nullable=True)  # Chemin vers le fichier de quittance généré
+    quittance_envoyee = Column(Boolean, default=False)  # Si la quittance a été envoyée par email
+    date_envoi_quittance = Column(DateTime, nullable=True)  # Date d'envoi de la quittance par email
     created_at = Column(DateTime, default=datetime.now)
     
     # Relations

@@ -1152,7 +1152,10 @@ elif menu == "📝 Quittances":
                                     st.success("✅ Statut mis à jour!")
                                     st.rerun()
                             
-                            with col_btn2:
+                            # Boutons pour générer/télécharger et envoyer par email
+                            col_btn1, col_btn2, col_btn3 = st.columns(3)
+                            
+                            with col_btn1:
                                 # Bouton pour générer/télécharger la quittance
                                 if st.button("📄 Générer quittance", key=f"gen_{q['id']}"):
                                     paiement = db.get_paiement_by_id(q['id'])
@@ -1186,6 +1189,61 @@ elif menu == "📝 Quittances":
                                             key=f"dl_{q['id']}"
                                         )
                                     st.success(f"✅ Quittance générée : {os.path.basename(fichier_path)}")
+                            
+                            with col_btn2:
+                                # Afficher le statut d'envoi
+                                if q['paiement'].quittance_envoyee:
+                                    st.info(f"📧 Envoyée le {q['paiement'].date_envoi_quittance.strftime('%d/%m/%Y à %H:%M') if q['paiement'].date_envoi_quittance else 'Date inconnue'}")
+                            
+                            with col_btn3:
+                                # Bouton pour envoyer par email
+                                if st.button("📧 Envoyer par mail", key=f"email_{q['id']}"):
+                                    paiement = db.get_paiement_by_id(q['id'])
+                                    
+                                    # Vérifier si le locataire a un email
+                                    if not locataire.email:
+                                        st.error("❌ Le locataire n'a pas d'adresse email !")
+                                    else:
+                                        # Générer la quittance si elle n'existe pas
+                                        if not paiement.chemin_quittance or not os.path.exists(paiement.chemin_quittance):
+                                            fichier_path = qt.generer_quittance_complete(
+                                                locataire=locataire,
+                                                bail=bail,
+                                                chambre=chambre,
+                                                appartement=appt_selectionne,
+                                                paiement=paiement,
+                                                mois=q['mois'],
+                                                annee=q['annee']
+                                            )
+                                            db.update_paiement(
+                                                q['id'],
+                                                quittance_generee=True,
+                                                chemin_quittance=fichier_path,
+                                                date_quittance=date.today()
+                                            )
+                                        else:
+                                            fichier_path = paiement.chemin_quittance
+                                        
+                                        # Envoyer l'email
+                                        success, message = ea.envoyer_quittance_email(
+                                            locataire=locataire,
+                                            paiement=paiement,
+                                            chambre=chambre,
+                                            appartement=appt_selectionne,
+                                            chemin_quittance=fichier_path
+                                        )
+                                        
+                                        if success:
+                                            # Mettre à jour le statut d'envoi
+                                            db.update_paiement(
+                                                q['id'],
+                                                quittance_envoyee=True,
+                                                date_envoi_quittance=datetime.now()
+                                            )
+                                            st.success(f"✅ {message} - Envoyé à {locataire.email}")
+                                            st.rerun()
+                                        else:
+                                            st.error(f"❌ {message}")
 
 
 # ==================== PARAMÈTRES ====================
