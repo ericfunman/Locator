@@ -360,6 +360,24 @@ elif menu == "👥 Locataires":
                         if bail.notes:
                             st.write(f"**📝 Notes:** {bail.notes}")
                     
+                    # Afficher l'historique des loyers
+                    historiques = db.get_historique_by_bail(bail.id)
+                    if historiques:
+                        st.markdown("---")
+                        st.markdown("**📜 Historique des modifications de loyer:**")
+                        for hist in historiques:
+                            col_h1, col_h2 = st.columns([1, 3])
+                            with col_h1:
+                                st.write(f"📅 **{hist.date_application.strftime('%d/%m/%Y')}**")
+                            with col_h2:
+                                ancien_total = hist.ancien_loyer + hist.anciennes_charges
+                                nouveau_total = hist.nouveau_loyer + hist.nouvelles_charges
+                                diff = nouveau_total - ancien_total
+                                emoji = "📈" if diff > 0 else "📉" if diff < 0 else "➡️"
+                                st.write(f"{emoji} {hist.ancien_loyer:.2f} € → {hist.nouveau_loyer:.2f} € (Charges: {hist.anciennes_charges:.2f} € → {hist.nouvelles_charges:.2f} €)")
+                                if hist.notes:
+                                    st.caption(f"💬 {hist.notes}")
+                    
                     # Bouton pour modifier le loyer
                     if st.button("✏️ Modifier le loyer", key=f"edit_loyer_{bail.id}"):
                         st.session_state[f'editing_loyer_{bail.id}'] = True
