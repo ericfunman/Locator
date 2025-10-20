@@ -28,6 +28,29 @@ def migrate_db():
     try:
         # Crée uniquement les tables manquantes
         Base.metadata.create_all(engine)
+        
+        # Migration spécifique pour SQLite : ajouter les colonnes manquantes
+        import sqlite3
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        try:
+            # Vérifier et ajouter les colonnes d'envoi d'email
+            cursor.execute("PRAGMA table_info(paiements)")
+            colonnes = [col[1] for col in cursor.fetchall()]
+            
+            if 'quittance_envoyee' not in colonnes:
+                cursor.execute("ALTER TABLE paiements ADD COLUMN quittance_envoyee INTEGER DEFAULT 0")
+                print("✅ Colonne quittance_envoyee ajoutée")
+            
+            if 'date_envoi_quittance' not in colonnes:
+                cursor.execute("ALTER TABLE paiements ADD COLUMN date_envoi_quittance DATETIME")
+                print("✅ Colonne date_envoi_quittance ajoutée")
+            
+            conn.commit()
+        finally:
+            conn.close()
+        
         print("Migration de la base de données effectuée avec succès")
     except Exception as e:
         print(f"Erreur lors de la migration : {e}")
