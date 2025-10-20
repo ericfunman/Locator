@@ -236,9 +236,6 @@ Détails :
 
 Cordialement,
 {config['from_name']}
-
----
-Ceci est un message automatique, merci de ne pas y répondre directement.
 """
         
         msg.attach(MIMEText(corps, 'plain', 'utf-8'))
